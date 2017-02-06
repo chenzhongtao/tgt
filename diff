@@ -1,0 +1,82 @@
+diff --git a/usr/Makefile b/usr/Makefile
+index decf13c..afa5c3b 100644
+--- a/usr/Makefile
++++ b/usr/Makefile
+@@ -25,7 +25,7 @@ ifneq ($(SD_NOTIFY),)
+ CFLAGS += -DUSE_SYSTEMD
+ endif
+ 
+-ifneq ($(shell test -e /usr/include/sys/eventfd.h && test -e /usr/include/libaio.h && echo 1),)
++ifneq ($(shell test -e /usr/include/libaio.h && echo 1),)
+ CFLAGS += -DUSE_EVENTFD
+ TGTD_OBJS += bs_aio.o
+ LIBS += -laio
+@@ -49,7 +49,7 @@ CFLAGS += -Wall -Wstrict-prototypes -Werror -fPIC
+ CFLAGS += -DTGT_VERSION=\"$(VERSION)$(EXTRAVERSION)\"
+ CFLAGS += -DBSDIR=\"$(DESTDIR)$(libdir)/backing-store\"
+ 
+-LIBS += -lpthread -ldl
++LIBS += -lpthread -ldl -lrt
+ 
+ ifneq ($(SD_NOTIFY),)
+ LIBS += -lsystemd
+@@ -59,6 +59,7 @@ PROGRAMS += tgtd tgtadm tgtimg
+ TGTD_OBJS += tgtd.o mgmt.o target.o scsi.o log.o driver.o util.o work.o \
+ 		concat_buf.o parser.o spc.o sbc.o mmc.o osd.o scc.o smc.o \
+ 		ssc.o libssc.o bs_rdwr.o bs_ssc.o \
++		bs_vio.o vio.o \
+ 		bs_null.o bs_sg.o bs.o libcrc32c.o bs_sheepdog.o
+ 
+ TGTD_DEP = $(TGTD_OBJS:.o=.d)
+diff --git a/usr/bs.c b/usr/bs.c
+index 8171a32..f9c4dd4 100644
+--- a/usr/bs.c
++++ b/usr/bs.c
+@@ -406,7 +406,7 @@ tgtadm_err bs_thread_open(struct bs_thread_info *info, request_func_t *rfn,
+ 	if (!info->worker_thread)
+ 		return TGTADM_NOMEM;
+ 
+-	eprintf("%d\n", nr_threads);
++	//eprintf("%d\n", nr_threads);
+ 	info->request_fn = rfn;
+ 
+ 	INIT_LIST_HEAD(&info->pending_list);
+diff --git a/usr/iscsi/iscsid.c b/usr/iscsi/iscsid.c
+index 2918615..f2c3899 100644
+--- a/usr/iscsi/iscsid.c
++++ b/usr/iscsi/iscsid.c
+@@ -2563,7 +2563,7 @@ static struct tgt_driver iscsi = {
+ 	.transportid		= iscsi_transportid,
+ 	.default_bst		= "rdwr",
+ };
+-
++//constructor will execute before main function
+ __attribute__((constructor)) static void iscsi_driver_constructor(void)
+ {
+ 	register_driver(&iscsi);
+diff --git a/usr/sbc.c b/usr/sbc.c
+index 779dacd..4c7cb2b 100644
+--- a/usr/sbc.c
++++ b/usr/sbc.c
+@@ -735,7 +735,7 @@ static tgtadm_err sbc_lu_init(struct scsi_lu *lu)
+ 	if (spc_lu_init(lu))
+ 		return TGTADM_NOMEM;
+ 
+-	strncpy(lu->attrs.product_id, "VIRTUAL-DISK", sizeof(lu->attrs.product_id));
++	strncpy(lu->attrs.product_id, "COMET-DISK", sizeof(lu->attrs.product_id));
+ 	lu->attrs.version_desc[0] = 0x04C0; /* SBC-3 no version claimed */
+ 	lu->attrs.version_desc[1] = 0x0960; /* iSCSI */
+ 	lu->attrs.version_desc[2] = 0x0300; /* SPC-3 */
+diff --git a/usr/tgtd.h b/usr/tgtd.h
+index d8b2ac1..d10de88 100644
+--- a/usr/tgtd.h
++++ b/usr/tgtd.h
+@@ -28,7 +28,7 @@ struct concat_buf;
+ #define BLOCK_DESCRIPTOR_LEN	8
+ #define VERSION_DESCRIPTOR_LEN	8
+ 
+-#define VENDOR_ID	"IET"
++#define VENDOR_ID	"COMET"
+ 
+ #define _TAB1 "    "
+ #define _TAB2 _TAB1 _TAB1
