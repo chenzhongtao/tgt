@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <time.h>
 
 #include "log.h"
 
@@ -45,6 +46,7 @@ static struct logarea *la;
 static char *log_name;
 int is_debug = 0;
 static pid_t pid;
+static FILE *logfile;
 
 static int logarea_init (int size)
 {
@@ -52,7 +54,7 @@ static int logarea_init (int size)
 	extern char mgmt_path[];
 	key_t semkey;
 
-	logdbg(stderr,"enter logarea_init\n");
+	syslog(LOG_INFO,"enter logarea_init\n");
 
 	if ((shmid = shmget(IPC_PRIVATE, sizeof(struct logarea),
 			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
@@ -115,8 +117,8 @@ static int logarea_init (int size)
 		return 1;
 	}
 
-        if ((semget(semkey, 0, IPC_EXCL)) > 0) {
-		/* Semkey may exists after SIGKILL tgtd */
+    if ((semget(semkey, 0, IPC_EXCL)) > 0) {
+		// Semkey may exists after SIGKILL targetd
 		syslog(LOG_WARNING, "semkey 0x%x already exists", semkey);
 	}
 	if ((la->semid = semget(semkey, 1, 0666 | IPC_CREAT)) < 0) {
@@ -215,8 +217,8 @@ static int log_enqueue(int prio, const char *fmt, va_list ap)
 	lastmsg->next = la->tail;
 	msg->next = la->head;
 
-	logdbg(stderr, "enqueue: %p, %p, %i, %s\n", (void *)msg, msg->next,
-		msg->prio, (char *)&msg->str);
+	//syslog(LOG_INFO, "enqueue: %p, %p, %i, %s\n", (void *)msg, msg->next,
+	//	msg->prio, (char *)&msg->str);
 
 #if LOGDBG
 	dump_logarea();
@@ -253,14 +255,26 @@ static int log_dequeue(void *buff)
 	return la->empty;
 }
 
+static void getDateTime(char *nowtime)
+{
+    time_t rawtime;
+    struct tm* ltime;
+    time(&rawtime);
+    ltime = localtime(&rawtime);
+    strftime(nowtime, 20, "%Y-%m-%d %H:%M:%S", ltime);
+}
+
 /*
  * this one can block under memory pressure
  */
 static void log_syslog (void * buff)
 {
 	struct logmsg * msg = (struct logmsg *)buff;
-
-	syslog(msg->prio, "%s", (char *)&msg->str);
+	char nowtime[20];
+    getDateTime(nowtime);
+	//syslog(msg->prio, "%s", (char *)&msg->str);
+	fprintf(logfile, "%s %d %s", nowtime, msg->prio, (char *)&msg->str);
+	fflush(logfile);
 }
 
 static void dolog(int prio, const char *fmt, va_list ap)
@@ -347,7 +361,7 @@ static void log_flush(void)
 
 static void log_sigsegv(void)
 {
-	log_error("tgtd logger exits abnormally, pid:%d\n", getpid());
+	log_error("targetd logger exits abnormally, pid:%d err:%s\n", getpid(), strerror(errno));
 	log_flush();
 	closelog();
 	free_logarea();
@@ -357,8 +371,6 @@ static void log_sigsegv(void)
 int log_init(char *program_name, int size, int daemon, int debug)
 {
 	is_debug = debug;
-
-	logdbg(stderr,"enter log_init\n");
 	log_name = program_name;
 
 	if (daemon) {
@@ -366,7 +378,13 @@ int log_init(char *program_name, int size, int daemon, int debug)
 		struct sigaction sa_new;
 
 		openlog(log_name, 0, LOG_DAEMON);
-		setlogmask (LOG_UPTO (LOG_DEBUG));
+		setlogmask(LOG_UPTO (LOG_DEBUG));
+
+		logfile = fopen("/var/log/comet/target.log", "a+");
+	    if (logfile == NULL) {
+            syslog(LOG_ERR, "failed to create log file\n");
+            return 1;
+	    }
 
 		if (logarea_init(size)) {
 			syslog(LOG_ERR, "failed to initialize the logger\n");
@@ -380,13 +398,13 @@ int log_init(char *program_name, int size, int daemon, int debug)
 			return 1;
 		} else if (pid) {
 			syslog(LOG_WARNING,
-			       "tgtd daemon started, pid:%d\n", getpid());
+			       "targetd daemon started, pid:%d\n", getpid());
 			syslog(LOG_WARNING,
-			       "tgtd logger started, pid:%d debug:%d\n", pid, is_debug);
+			       "targetd logger started, pid:%d debug:%d\n", pid, is_debug);
 			return 0;
 		}
 
-		/* flush on daemon's crash */
+		// flush on daemon's crash
 		sa_new.sa_handler = (void*)log_sigsegv;
 		sigemptyset(&sa_new.sa_mask);
 		sa_new.sa_flags = 0;
@@ -411,9 +429,13 @@ void log_close(void)
 		la->active = 0;
 		waitpid(pid, NULL, 0);
 
-		log_warning("tgtd logger stopped, pid:%d\n", pid);
+		log_warning("targetd logger stopped, pid:%d\n", pid);
 		log_flush();
 		closelog();
 		free_logarea();
+	}
+
+	if (logfile != NULL) {
+        fclose(logfile);
 	}
 }

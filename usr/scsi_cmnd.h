@@ -141,5 +141,5 @@ static inline int cmd_##name(const struct scsi_cmd *c)			\
 
 CMD_FNS(QUEUED, queued)
 CMD_FNS(PROCESSED, processed)
-CMD_FNS(ASYNC, async)
+CMD_FNS(ASYNC, async)      //set_cmd_async clear_cmd_async cmd_async
 CMD_FNS(NOT_LAST, not_last)

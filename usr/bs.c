@@ -406,7 +406,7 @@ tgtadm_err bs_thread_open(struct bs_thread_info *info, request_func_t *rfn,
 	if (!info->worker_thread)
 		return TGTADM_NOMEM;
 
-	eprintf("%d\n", nr_threads);
+	//eprintf("%d\n", nr_threads);
 	info->request_fn = rfn;
 
 	INIT_LIST_HEAD(&info->pending_list);

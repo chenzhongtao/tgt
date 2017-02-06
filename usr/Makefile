@@ -25,7 +25,7 @@ ifneq ($(SD_NOTIFY),)
 CFLAGS += -DUSE_SYSTEMD
 endif
 
-ifneq ($(shell test -e /usr/include/sys/eventfd.h && test -e /usr/include/libaio.h && echo 1),)
+ifneq ($(shell test -e /usr/include/libaio.h && echo 1),)
 CFLAGS += -DUSE_EVENTFD
 TGTD_OBJS += bs_aio.o
 LIBS += -laio
@@ -49,17 +49,18 @@ CFLAGS += -Wall -Wstrict-prototypes -Werror -fPIC
 CFLAGS += -DTGT_VERSION=\"$(VERSION)$(EXTRAVERSION)\"
 CFLAGS += -DBSDIR=\"$(DESTDIR)$(libdir)/backing-store\"
 
-LIBS += -lpthread -ldl
+LIBS += -lpthread -ldl -lrt
 
 ifneq ($(SD_NOTIFY),)
 LIBS += -lsystemd
 endif
 
-PROGRAMS += tgtd tgtadm tgtimg
+PROGRAMS += targetd targetadm tgtimg
 TGTD_OBJS += tgtd.o mgmt.o target.o scsi.o log.o driver.o util.o work.o \
 		concat_buf.o parser.o spc.o sbc.o mmc.o osd.o scc.o smc.o \
 		ssc.o libssc.o bs_rdwr.o bs_ssc.o \
-		bs_null.o bs_sg.o bs.o libcrc32c.o bs_sheepdog.o
+		bs_vio.o vio.o ring.o bs_viou.o viou.o\
+		bs_null.o bs_sg.o bs.o libcrc32c.o
 
 TGTD_DEP = $(TGTD_OBJS:.o=.d)
 
@@ -68,17 +69,19 @@ LDFLAGS = -Wl,-E,-rpath=$(libdir)
 .PHONY:all
 all: $(PROGRAMS) $(MODULES)
 
-tgtd: $(TGTD_OBJS)
+targetd: $(TGTD_OBJS)
 	echo $(CC) $^ -o $@ $(LIBS)
-	$(CC) $^ -o $@ $(LDFLAGS) $(LIBS)
+	$(CC) $^ -g -o $@ $(LDFLAGS) $(LIBS)
+	cp $@ ../../bin
 
 -include $(TGTD_DEP)
 
 TGTADM_OBJS = tgtadm.o concat_buf.o
 TGTADM_DEP = $(TGTADM_OBJS:.o=.d)
 
-tgtadm: $(TGTADM_OBJS)
+targetadm: $(TGTADM_OBJS)
 	$(CC) $^ -o $@
+	cp $@ ../../bin
 
 -include $(TGTADM_DEP)
 
@@ -115,3 +118,6 @@ endif
 .PHONY: clean
 clean:
 	rm -f *.[od] *.so $(PROGRAMS) iscsi/*.[od] ibmvio/*.[od] fc/*.[od]
+
+test:
+	cp targetd /usr/local/bin && cp targetadm /usr/local/bin

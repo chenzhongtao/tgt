@@ -1,7 +1,8 @@
 #ifndef TGTADM_H
 #define TGTADM_H
 
-#define TGT_IPC_DIR		"/var/run/tgtd"
+//#define TGT_IPC_DIR		"/var/run/tgtd"
+#define TGT_IPC_DIR		    "/var/lib/comet/controller/target"
 #define TGT_IPC_NAMESPACE	TGT_IPC_DIR"/socket"
 #define TGT_LLD_NAME_LEN	64
 

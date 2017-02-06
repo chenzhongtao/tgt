@@ -2563,7 +2563,7 @@ static struct tgt_driver iscsi = {
 	.transportid		= iscsi_transportid,
 	.default_bst		= "rdwr",
 };
-
+//constructor will execute before main function
 __attribute__((constructor)) static void iscsi_driver_constructor(void)
 {
 	register_driver(&iscsi);

@@ -430,8 +430,10 @@ static int iscsi_tcp_init(void)
 	/* if the user did not set a portal we default to wildcard
 	   for ipv4 and ipv6
 	*/
+	extern short int data_port;
 	if (list_empty(&iscsi_portals_list)) {
-		iscsi_add_portal(NULL, 3260, 1);
+		//iscsi_add_portal(NULL, 3260, 1);
+		iscsi_add_portal(NULL, data_port, 1);
 	}
 
 	INIT_LIST_HEAD(&iscsi_tcp_conn_list);

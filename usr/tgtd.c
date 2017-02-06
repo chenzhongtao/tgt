@@ -47,13 +47,14 @@ unsigned long pagesize, pageshift;
 
 int system_active = 1;
 static int ep_fd;
-static char program_name[] = "tgtd";
+static char program_name[] = "targetd";
 static LIST_HEAD(tgt_events_list);
 static LIST_HEAD(tgt_sched_events_list);
 
 static struct option const long_options[] = {
 	{"foreground", no_argument, 0, 'f'},
 	{"control-port", required_argument, 0, 'C'},
+	{"data-port", required_argument, 0, 'D'},
 	{"nr_iothreads", required_argument, 0, 't'},
 	{"debug", required_argument, 0, 'd'},
 	{"version", no_argument, 0, 'V'},
@@ -76,6 +77,7 @@ static void usage(int status)
 		"Usage: %s [OPTION]\n"
 		"-f, --foreground        make the program run in the foreground\n"
 		"-C, --control-port NNNN use port NNNN for the mgmt channel\n"
+		"-D, --data-port    NNNN use port NNNN for the data channel\n"
 		"-t, --nr_iothreads NNNN specify the number of I/O threads\n"
 		"-d, --debug debuglevel  print debugging information\n"
 		"-V, --version           print version and exit\n"
@@ -103,6 +105,9 @@ static void version(void)
 
 /* Default TGT mgmt port */
 short int control_port;
+
+/* Default TGT data port */
+short int data_port;
 
 static void signal_catch(int signo)
 {
@@ -548,6 +553,11 @@ int main(int argc, char **argv)
 		case 'C':
 			ret = str_to_int_ge(optarg, control_port, 0);
 			if (ret)
+				bad_optarg(ret, ch, optarg);
+			break;
+		case 'D':
+		    ret = str_to_int_ge(optarg, data_port, 0);
+		    if (ret)
 				bad_optarg(ret, ch, optarg);
 			break;
 		case 't':

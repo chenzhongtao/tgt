@@ -46,7 +46,7 @@
 
 #define BUFSIZE 4096
 
-static const char program_name[] = "tgtadm";
+static const char program_name[] = "targetadm";
 static int debug;
 
 static const char *tgtadm_strerror(int err)
