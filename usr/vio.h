@@ -48,6 +48,7 @@ enum {
 
 struct vio_connection *new_vio_connection(char *socket_path, char *shm_file);
 int shutdown_vio_connection(struct vio_connection *conn);
+void drain_cmnd(struct vio_connection *conn);
 
 int read_at(struct vio_connection *conn, void *buf, size_t count, off_t offset);
 int write_at(struct vio_connection *conn, void *buf, size_t count, off_t offset);

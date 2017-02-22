@@ -45,7 +45,8 @@ enum uint32_t {
 	TypeOK       = 0x80,
 	TypeError    = 0x81,
 	TypeEOF      = 0x82,
-	TypeTimeout  = 0x83
+	TypeTimeout  = 0x83,
+	TypeClose    = 0x86
 };
 
 #pragma pack(1)

@@ -44,7 +44,8 @@ enum uint32_t {
 	TypeOK       = 0x80,
 	TypeError    = 0x81,
 	TypeEOF      = 0x82,
-	TypeTimeout  = 0x83
+	TypeTimeout  = 0x83,
+	TypeClose    = 0x86
 };
 
 int send_msg(int fd, struct Message *msg);
@@ -69,6 +70,7 @@ enum {
 
 struct viou_connection *new_viou_connection(char *socket_path);
 int shutdown_viou_connection(struct viou_connection *conn);
+void drain_request(struct viou_connection *conn);
 
 int read_at_unix(struct viou_connection *conn, void *buf, size_t count, off_t offset);
 int write_at_unix(struct viou_connection *conn, void *buf, size_t count, off_t offset);

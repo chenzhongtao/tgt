@@ -207,6 +207,13 @@ void* response_process_unix(void *arg) {
             eprintf("Receive timeout for response %d of seq %lu: %s\n",
                                         resp->Type, (unsigned long)resp->Seq, (char *)resp->Data);
             break;
+        case TypeClose:
+            log_error("Receive close for response %d of seq %lu\n",
+                                        resp->Type, (unsigned long)resp->Seq);
+            pthread_mutex_lock(&conn->mutex);
+            drain_request(conn);
+            pthread_mutex_unlock(&conn->mutex);
+            break;
         default:
             eprintf("Unknown message type %d\n", resp->Type);
         }
@@ -400,7 +407,7 @@ struct viou_connection *new_viou_connection(char *socket_path) {
     return conn;
 }
 
-int shutdown_viou_connection(struct viou_connection *conn) {
+int shutdown_viou_connection1(struct viou_connection *conn) {
 	struct Message *req, *tmp;
 	pthread_mutex_lock(&conn->mutex);
 	conn->state = CLIENT_CONN_STATE_CLOSE; //prevent future requests
@@ -420,6 +427,35 @@ int shutdown_viou_connection(struct viou_connection *conn) {
     close(conn->fd);
     free(conn);
     return 0;
+}
+
+int shutdown_viou_connection(struct viou_connection *conn) {
+	pthread_mutex_lock(&conn->mutex);
+	conn->state = CLIENT_CONN_STATE_CLOSE; //prevent future requests
+	drain_request(conn);
+	pthread_mutex_unlock(&conn->mutex);
+
+    close(conn->fd);
+    free(conn);
+    return 0;
+}
+
+
+void drain_request(struct viou_connection *conn) {
+	struct Message *req, *tmp;
+
+	//clean up and fail all pending requests
+	HASH_ITER(hh, conn->msg_table, req, tmp) {
+        HASH_DEL(conn->msg_table, req);
+
+        pthread_mutex_lock(&req->mutex);
+        req->Type = TypeError;
+        eprintf("Cancel request %lu due to disconnection", (unsigned long)req->Seq);
+        pthread_mutex_unlock(&req->mutex);
+        pthread_cond_signal(&req->cond);
+	}
+
+    return;
 }
 
 

@@ -56,6 +56,7 @@ static struct option const long_options[] = {
 	{"control-port", required_argument, 0, 'C'},
 	{"data-port", required_argument, 0, 'D'},
 	{"nr_iothreads", required_argument, 0, 't'},
+	{"name", required_argument, 0, 'n'},
 	{"debug", required_argument, 0, 'd'},
 	{"version", no_argument, 0, 'V'},
 	{"help", no_argument, 0, 'h'},
@@ -79,6 +80,7 @@ static void usage(int status)
 		"-C, --control-port NNNN use port NNNN for the mgmt channel\n"
 		"-D, --data-port    NNNN use port NNNN for the data channel\n"
 		"-t, --nr_iothreads NNNN specify the number of I/O threads\n"
+		"-n, --name         NNNN specify the target name\n"
 		"-d, --debug debuglevel  print debugging information\n"
 		"-V, --version           print version and exit\n"
 		"-h, --help              display this help and exit\n",
@@ -565,6 +567,8 @@ int main(int argc, char **argv)
 			if (ret)
 				bad_optarg(ret, ch, optarg);
 			break;
+		case 'n':
+		    break;
 		case 'd':
 			ret = str_to_int_range(optarg, is_debug, 0, 1);
 			if (ret)
@@ -603,7 +607,8 @@ int main(int argc, char **argv)
 	if (err)
 		exit(1);
 
-	err = log_init(program_name, LOG_SPACE_SIZE, is_daemon, is_debug);
+	//err = log_init(program_name, LOG_SPACE_SIZE, is_daemon, is_debug);
+	err = log_init(program_name, LOG_SPACE_SIZE, 0, is_debug);
 	if (err)
 		exit(1);
 

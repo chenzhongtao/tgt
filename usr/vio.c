@@ -145,6 +145,13 @@ void* response_process(void *arg) {
             log_error("[receive_response] Receive timeout for response %d of seq %lu\n",
                                         cmd->rtype, (unsigned long)cmd->seq);
             break;
+        case TypeClose:
+            log_error("[receive_response] Receive close for response %d of seq %lu\n",
+                                        cmd->rtype, (unsigned long)cmd->seq);
+            pthread_mutex_lock(&conn->mutex);
+            drain_cmnd(conn);
+            pthread_mutex_unlock(&conn->mutex);
+            break;
         default:
             log_error("[receive_response] Unknown message type %d\n", cmd->rtype);
         }
@@ -257,6 +264,20 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
     int i, connected = 0;
     struct vio_connection *conn = NULL;
 
+    conn = malloc(sizeof(struct vio_connection));
+    if (conn == NULL) {
+        log_error("[new_vio_connection] cannot allocate memory for conn\n");
+        return NULL;
+    }
+
+    //初始化ring buffer, 必须先初始化，再与vio建立unix链接，否则有可能vio进程
+    //在open共享文件时，报no such file or directory
+    conn->msg_buffer = (struct ringbuffer *)init(shm_file);
+    if (NULL == conn->msg_buffer) {
+        log_error("[new_vio_connection] fail to alloc ringbuffer\n");
+        exit(-EFAULT);
+    }
+
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1) {
         log_error("[new_vio_connection] socket error\n");
@@ -287,12 +308,6 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
         exit(-EFAULT);
     }
 
-    conn = malloc(sizeof(struct vio_connection));
-    if (conn == NULL) {
-        log_error("[new_vio_connection] cannot allocate memory for conn\n");
-        return NULL;
-    }
-
     conn->fd = fd;
     conn->seq = 0;
 
@@ -302,19 +317,12 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
         exit(-EFAULT);
     }
 
-    //初始化ring buffer
-    conn->msg_buffer = (struct ringbuffer *)init(shm_file);
-    if (NULL == conn->msg_buffer) {
-        log_error("[new_vio_connection] fail to alloc ringbuffer\n");
-        exit(-EFAULT);
-    }
-
 	log_debug("[new_vio_connection] socket_path:%s successfully\n", socket_path);
     conn->state = CLIENT_CONN_STATE_OPEN;
     return conn;
 }
 
-int shutdown_vio_connection(struct vio_connection *conn) {
+int shutdown_vio_connection1(struct vio_connection *conn) {
     struct cmnd_idx *cidx = NULL;
     struct cmnd *cmd = NULL;
     int retry = 5;
@@ -362,3 +370,61 @@ int shutdown_vio_connection(struct vio_connection *conn) {
     return 0;
 }
 
+
+int shutdown_vio_connection(struct vio_connection *conn) {
+    if (NULL == conn) {
+        return 0;
+    }
+
+    pthread_mutex_lock(&conn->mutex);
+    if (conn->state == CLIENT_CONN_STATE_CLOSE) {
+        pthread_mutex_unlock(&conn->mutex);
+        return 0;
+    }
+
+	conn->state = CLIENT_CONN_STATE_CLOSE; //prevent future requests
+
+	drain_cmnd(conn);
+
+	pthread_mutex_unlock(&conn->mutex);
+
+	destroy(conn->msg_buffer);
+    close(conn->fd);
+    free(conn);
+    conn=NULL;
+    log_debug("shutdown_vio_connection successfully\n");
+    return 0;
+}
+
+void drain_cmnd(struct vio_connection *conn) {
+    struct cmnd_idx *cidx = NULL;
+    struct cmnd *cmd = NULL;
+    int retry = 5;
+
+    if (NULL == conn) {
+        return;
+    }
+
+	//清理共享内存中所有未处理的cmnd
+    list_for_each_entry(cidx, &conn->msg_buffer->used_list, used) {
+        pthread_mutex_lock(&conn->msg_buffer->mutex);
+        cmd = cidx->cmd;
+		cmd->rtype = TypeError;
+        pthread_mutex_unlock(&conn->msg_buffer->mutex);
+        pthread_cond_signal(&cmd->cond);
+    }
+
+    //等待所有命令返回iscsi
+    while (retry--) {
+        pthread_mutex_lock(&conn->msg_buffer->mutex);
+        if (conn->msg_buffer->restix == CMD_DEPTH) {
+            pthread_mutex_unlock(&conn->msg_buffer->mutex);
+            break;
+        }
+        pthread_mutex_unlock(&conn->msg_buffer->mutex);
+        log_debug("shutdown_vio_connection wait for cmd complete retry:%d", retry);
+        usleep(100000); //100ms
+    }
+
+    return;
+}
