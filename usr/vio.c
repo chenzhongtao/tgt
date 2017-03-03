@@ -189,7 +189,7 @@ int new_seq(struct vio_connection *conn) {
 
 int process_request(struct vio_connection *conn, void *buf, size_t count, off_t offset,
                 uint32_t type) {
-    //struct Message *req = malloc(sizeof(struct Message));
+    //struct Message *req = malloc(sizeof(struct Message)); 
     struct cmnd *cmd = NULL;
     int rc = 0;
     uint32_t idx = 0; //命令数组的下标
@@ -258,7 +258,7 @@ int write_at(struct vio_connection *conn, void *buf, size_t count, off_t offset)
 }
 
 struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
-    //eprintf("new_vio_connection socket_path:%s", socket_path);
+    //eprintf("new_vio_connection socket_path:%s", socket_path); 
     struct sockaddr_un addr;
     int fd, rc = 0;
     int i, connected = 0;

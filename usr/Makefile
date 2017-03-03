@@ -1,3 +1,7 @@
+VERSION ?= 3.0.8
+
+export VERSION PREFIX
+
 sbindir ?= $(PREFIX)/sbin
 libdir ?= $(PREFIX)/lib/tgt
 
