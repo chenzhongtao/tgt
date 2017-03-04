@@ -80,7 +80,7 @@ struct ringbuffer *init(char *shm_file)
         goto error;
     }
 
-    //³õÊ¼»¯ÃüÁîÇøÓò
+    //åˆå§‹åŒ–å‘½ä»¤åŒºåŸŸ
     for (i = 0; i < CMD_DEPTH; i++) {
         cmd = &(ringbuf->buffer->cmds[i]);
         cmd->state = STATE_FREE;
@@ -140,7 +140,7 @@ int destroy(struct ringbuffer *ringbuf)
 			munmap(ringbuf->buffer, ringbuf->size);
 		}
 
-		//É¾³ı¹²ÏíÄÚ´æÎÄ¼ş
+		//åˆ é™¤å…±äº«å†…å­˜æ–‡ä»¶
         remove(ringbuf->shm_file);
 
 		free(ringbuf);
@@ -160,89 +160,89 @@ struct cmnd * add(struct ringbuffer *rbuf, void *buf, uint32_t length, int64_t o
         if (length <= CMD_COMMON_LEN) {
             pthread_mutex_lock(&rbuf->mutex);
 			item = rbuf->free_list.next;
-			if (item == NULL) {  //¿ÕÏĞÁ´±íÃ»ÓĞÔªËØ
+			if (item == NULL) {  //ç©ºé—²é“¾è¡¨æ²¡æœ‰å…ƒç´ 
 			    pthread_mutex_unlock(&rbuf->mutex);
 				goto wait;
 			}
             cidx = container_of(item, struct cmnd_idx, free);
-            list_del(&cidx->free); //ÍÑÀë¿ÕÏĞÁ´±í
-			list_add_tail(&cidx->used, &rbuf->used_list); //¼ÓÈëÊ¹ÓÃÁ´±í±íÎ²
+            list_del(&cidx->free); //è„±ç¦»ç©ºé—²é“¾è¡¨
+			list_add_tail(&cidx->used, &rbuf->used_list); //åŠ å…¥ä½¿ç”¨é“¾è¡¨è¡¨å°¾
 			pthread_mutex_unlock(&rbuf->mutex);
 			cmd = cidx->cmd;
 			*idx = cidx->idx;
 			cmd->state = STATE_SEND;
 		} else {
-		    pthread_mutex_lock(&rbuf->mutex);
-            cmd = rbuf->buffer->huge;  //4¸öcommonÃüÁî×é³ÉÒ»¸öhugeÃüÁî
-            if (cmd->state != STATE_FREE) { //hugeÃüÁîÊÇ·ñ±»Ê¹ÓÃ
-                pthread_mutex_unlock(&rbuf->mutex);
+			pthread_mutex_lock(&rbuf->mutex);
+			cmd = rbuf->buffer->huge;  //4ä¸ªcommonå‘½ä»¤ç»„æˆä¸€ä¸ªhugeå‘½ä»¤
+			if (cmd->state != STATE_FREE) { //hugeå‘½ä»¤æ˜¯å¦è¢«ä½¿ç”¨
+				pthread_mutex_unlock(&rbuf->mutex);
 				goto wait;
-            }
+			}
 
-            cmd->state = STATE_SEND;
-            pthread_mutex_unlock(&rbuf->mutex);
-            *idx = CMD_HUGE_IDX;
+			cmd->state = STATE_SEND;
+			pthread_mutex_unlock(&rbuf->mutex);
+			*idx = CMD_HUGE_IDX;
 		}
 
-        //¸ù¾İ²ÎÊıÌî³äcmndÃüÁî
+		//æ ¹æ®å‚æ•°å¡«å……cmndå‘½ä»¤
 		cmd->length = length;
 		cmd->seq = seq;
 		cmd->type = type;
 		cmd->offset = offset;
 
 		//eprintf("add cmd idx:%u, state:%u, length:%u, seq:%llu, type:%u, offset:%lld", *idx,
-	    //				cmd->state, cmd->length, (long long unsigned)cmd->seq, cmd->type, (long long int)cmd->offset);
+		//				cmd->state, cmd->length, (long long unsigned)cmd->seq, cmd->type, (long long int)cmd->offset);
 
-        if (cmd->type == TypeWrite) {
-		    memcpy(cmd->data, buf, length); //½«Êı¾İ¿½±´µ½¹²ÏíÄÚ´æÖĞ
-        }
-        break;
+		if (cmd->type == TypeWrite) {
+			memcpy(cmd->data, buf, length); //å°†æ•°æ®æ‹·è´åˆ°å…±äº«å†…å­˜ä¸­
+		}
+		break;
 wait:
 		//wait for a minite
 		sched_yield();
 		log_debug("add cmd sched_yield\n");
-    } while(1);
+	} while(1);
 
-    return cmd;
+	return cmd;
 }
 
 int del(struct ringbuffer *rbuf, uint32_t idx)
 {
-    struct cmnd_idx *cidx = NULL;
-    struct cmnd *cmd = NULL;
-    uint8_t flag = 0;
+	struct cmnd_idx *cidx = NULL;
+	struct cmnd *cmd = NULL;
+	uint8_t flag = 0;
 
-    if (idx != CMD_HUGE_IDX) {
-        pthread_mutex_lock(&rbuf->mutex);
-        list_for_each_entry(cidx, &rbuf->used_list, used) {
-            if (idx == cidx->idx) {
-                flag = 1;
-                break;
-            }
-        }
+	if (idx != CMD_HUGE_IDX) {
+		pthread_mutex_lock(&rbuf->mutex);
+		list_for_each_entry(cidx, &rbuf->used_list, used) {
+			if (idx == cidx->idx) {
+				flag = 1;
+				break;
+			}
+		}
 
-        if (flag == 0) {
-            log_error("[del] Fatal error idx:%u not in used list\n", idx);
-            pthread_mutex_unlock(&rbuf->mutex);
-            return -1;
-        }
+		if (flag == 0) {
+			log_error("[del] Fatal error idx:%u not in used list\n", idx);
+			pthread_mutex_unlock(&rbuf->mutex);
+			return -1;
+		}
 
-        cidx->cmd->state = STATE_FREE;
-        list_add_tail(&cidx->free, &rbuf->free_list);
-        list_del(&cidx->used);
-        pthread_mutex_unlock(&rbuf->mutex);
-    } else {
-        pthread_mutex_lock(&rbuf->mutex);
-        cmd = get(rbuf, idx);
-        cmd->state = STATE_FREE;
-        pthread_mutex_unlock(&rbuf->mutex);
-    }
+		cidx->cmd->state = STATE_FREE;
+		list_add_tail(&cidx->free, &rbuf->free_list);
+		list_del(&cidx->used);
+		pthread_mutex_unlock(&rbuf->mutex);
+	} else {
+		pthread_mutex_lock(&rbuf->mutex);
+		cmd = get(rbuf, idx);
+		cmd->state = STATE_FREE;
+		pthread_mutex_unlock(&rbuf->mutex);
+	}
 
-    return 0;
+	return 0;
 }
 
 struct cmnd *get(struct ringbuffer *rbuf, uint32_t idx)
 {
-    return &(rbuf->buffer->cmds[idx]);
+	return &(rbuf->buffer->cmds[idx]);
 }
 

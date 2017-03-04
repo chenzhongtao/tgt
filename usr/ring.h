@@ -52,41 +52,41 @@ enum uint32_t {
 #pragma pack(1)
 
 struct cmnd {
-    uint32_t state;   //ÃüÁî×´Ì¬
-    uint32_t length;  //ÃüÁîÊı¾İ³¤¶È
-    uint64_t seq;     //ÃüÁîĞòºÅ
-    uint32_t type;    //ÃüÁîÀàĞÍ
-    uint32_t rtype;   //ÃüÁî·µ»ØÀàĞÍ
-    int64_t  offset;  //ÃüÁîÔÚ´ÅÅÌµÄÆ«ÒÆ
+    uint32_t state;   //å‘½ä»¤çŠ¶æ€
+    uint32_t length;  //å‘½ä»¤æ•°æ®é•¿åº¦
+    uint64_t seq;     //å‘½ä»¤åºå·
+    uint32_t type;    //å‘½ä»¤ç±»å‹
+    uint32_t rtype;   //å‘½ä»¤è¿”å›ç±»å‹
+    int64_t  offset;  //å‘½ä»¤åœ¨ç£ç›˜çš„åç§»
     char     data[CMD_COMMON_LEN];
 
-    pthread_cond_t  cond; //ÃüÁîÍê³ÉÍ¨Öª
+    pthread_cond_t  cond; //å‘½ä»¤å®Œæˆé€šçŸ¥
     pthread_mutex_t mutex;
 };
 
 struct cmnd_idx {
-    uint32_t idx;          //ÃüÁîËùÔÚµÄÊı×éÏÂ±ê
-    struct list_head free; //Á´ÈëringbufferÖĞµÄ¿ÕÏĞÁ´±í
-    struct list_head used; //Á´ÈëringbufferÖĞµÄÊ¹ÓÃÁ´±í
-    struct cmnd *cmd;      //Ö¸Ïò¹²ÏíÄÚ´æ¶ÔÓ¦ÃüÁîµÄµØÖ·
+    uint32_t idx;          //å‘½ä»¤æ‰€åœ¨çš„æ•°ç»„ä¸‹æ ‡
+    struct list_head free; //é“¾å…¥ringbufferä¸­çš„ç©ºé—²é“¾è¡¨
+    struct list_head used; //é“¾å…¥ringbufferä¸­çš„ä½¿ç”¨é“¾è¡¨
+    struct cmnd *cmd;      //æŒ‡å‘å…±äº«å†…å­˜å¯¹åº”å‘½ä»¤çš„åœ°å€
 };
 
 struct ring {
-    uint32_t magic;               //Ä§Êı
-    struct cmnd cmds[CMD_DEPTH];  //commonÃüÁîÇøÓò
-    struct cmnd huge[0];         //hugeÃüÁîÇøÓò
+    uint32_t magic;               //é­”æ•°
+    struct cmnd cmds[CMD_DEPTH];  //commonå‘½ä»¤åŒºåŸŸ
+    struct cmnd huge[0];         //hugeå‘½ä»¤åŒºåŸŸ
 };
 
 struct ringbuffer {
-    uint32_t sendix; //ÏÂÒ»¸ö·¢ËÍÃüÁîËùÔÚÊı×éµÄ±àºÅ
-    uint32_t recvix; //ÏÂÒ»¸öÍê³ÉÃüÁîËùÔÚÊı¾İµÄ±àºÅ
-    uint32_t restix; //ÃüÁîÇøÓò¿ÕÏĞÃüÁîÊıÁ¿
-    uint32_t size;   //¹²ÏíÄÚ´æÇøÓò´óĞ¡
+    uint32_t sendix; //ä¸‹ä¸€ä¸ªå‘é€å‘½ä»¤æ‰€åœ¨æ•°ç»„çš„ç¼–å·
+    uint32_t recvix; //ä¸‹ä¸€ä¸ªå®Œæˆå‘½ä»¤æ‰€åœ¨æ•°æ®çš„ç¼–å·
+    uint32_t restix; //å‘½ä»¤åŒºåŸŸç©ºé—²å‘½ä»¤æ•°é‡
+    uint32_t size;   //å…±äº«å†…å­˜åŒºåŸŸå¤§å°
     struct ring *buffer;
-    struct list_head free_list; //ÃüÁî¿ÕÏĞÁ´±í
-    struct list_head used_list; //ÃüÁîÊ¹ÓÃÁ´±í
+    struct list_head free_list; //å‘½ä»¤ç©ºé—²é“¾è¡¨
+    struct list_head used_list; //å‘½ä»¤ä½¿ç”¨é“¾è¡¨
     char *shm_file;
-    pthread_mutex_t mutex;      //±£»¤ringbuffer½á¹¹
+    pthread_mutex_t mutex;      //ä¿æŠ¤ringbufferç»“æ„
 };
 
 struct ringbuffer *init(char *shm_file);

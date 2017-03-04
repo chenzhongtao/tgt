@@ -192,7 +192,7 @@ int process_request(struct vio_connection *conn, void *buf, size_t count, off_t 
     //struct Message *req = malloc(sizeof(struct Message)); 
     struct cmnd *cmd = NULL;
     int rc = 0;
-    uint32_t idx = 0; //ÃüÁîÊý×éµÄÏÂ±ê
+    uint32_t idx = 0; //å‘½ä»¤æ•°ç»„çš„ä¸‹æ ‡
 
     //log_debug("000");
 
@@ -270,8 +270,8 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
         return NULL;
     }
 
-    //³õÊ¼»¯ring buffer, ±ØÐëÏÈ³õÊ¼»¯£¬ÔÙÓëvio½¨Á¢unixÁ´½Ó£¬·ñÔòÓÐ¿ÉÄÜvio½ø³Ì
-    //ÔÚopen¹²ÏíÎÄ¼þÊ±£¬±¨no such file or directory
+    //åˆå§‹åŒ–ring buffer, å¿…é¡»å…ˆåˆå§‹åŒ–ï¼Œå†ä¸Žvioå»ºç«‹unixé“¾æŽ¥ï¼Œå¦åˆ™æœ‰å¯èƒ½vioè¿›ç¨‹
+    //åœ¨openå…±äº«æ–‡ä»¶æ—¶ï¼ŒæŠ¥no such file or directory
     conn->msg_buffer = (struct ringbuffer *)init(shm_file);
     if (NULL == conn->msg_buffer) {
         log_error("[new_vio_connection] fail to alloc ringbuffer\n");
@@ -339,7 +339,7 @@ int shutdown_vio_connection1(struct vio_connection *conn) {
 
 	conn->state = CLIENT_CONN_STATE_CLOSE; //prevent future requests
 
-	//ÇåÀí¹²ÏíÄÚ´æÖÐËùÓÐÎ´´¦ÀíµÄcmnd
+	//æ¸…ç†å…±äº«å†…å­˜ä¸­æ‰€æœ‰æœªå¤„ç†çš„cmnd
     list_for_each_entry(cidx, &conn->msg_buffer->used_list, used) {
         pthread_mutex_lock(&conn->msg_buffer->mutex);
         cmd = cidx->cmd;
@@ -348,7 +348,7 @@ int shutdown_vio_connection1(struct vio_connection *conn) {
         pthread_cond_signal(&cmd->cond);
     }
 
-    //µÈ´ýËùÓÐÃüÁî·µ»Øiscsi
+    //ç­‰å¾…æ‰€æœ‰å‘½ä»¤è¿”å›žiscsi
     while (retry--) {
         pthread_mutex_lock(&conn->msg_buffer->mutex);
         if (conn->msg_buffer->restix == CMD_DEPTH) {
@@ -405,7 +405,7 @@ void drain_cmnd(struct vio_connection *conn) {
         return;
     }
 
-	//ÇåÀí¹²ÏíÄÚ´æÖÐËùÓÐÎ´´¦ÀíµÄcmnd
+	//æ¸…ç†å…±äº«å†…å­˜ä¸­æ‰€æœ‰æœªå¤„ç†çš„cmnd
     list_for_each_entry(cidx, &conn->msg_buffer->used_list, used) {
         pthread_mutex_lock(&conn->msg_buffer->mutex);
         cmd = cidx->cmd;
@@ -414,7 +414,7 @@ void drain_cmnd(struct vio_connection *conn) {
         pthread_cond_signal(&cmd->cond);
     }
 
-    //µÈ´ýËùÓÐÃüÁî·µ»Øiscsi
+    //ç­‰å¾…æ‰€æœ‰å‘½ä»¤è¿”å›žiscsi
     while (retry--) {
         pthread_mutex_lock(&conn->msg_buffer->mutex);
         if (conn->msg_buffer->restix == CMD_DEPTH) {

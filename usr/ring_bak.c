@@ -84,7 +84,7 @@ struct ringbuffer *alloc(uint32_t size, char *shm_file)
     }
 	eprintf("^^^");
 
-    //³õÊ¼»¯ÃüÁîÇøÓò
+    //åˆå§‹åŒ–å‘½ä»¤åŒºåŸŸ
     for (i = 0; i < CMD_DEPTH; i++) {
         cmd = &(ringbuf->buffer->cmds[i]);
         cmd->state = STATE_FINISH;
@@ -135,19 +135,19 @@ struct cmnd * add(struct ringbuffer *rbuf, void *buf, uint32_t length, int64_t o
 
         if (rbuf->restix > 0) {
             if (rbuf->head > rbuf->tail) {
-                if (rbuf->head + length > rbuf->datasize) { //ĞèÒªÁ¬ĞøµÄÄÚ´æ¿Õ¼ä
-                    if (rbuf->tail > length) { //Êı¾İÇøÓòÎ²²¿²»×ãÒÔ·ÖÅä¸ÃÃüÁîµÄÄÚ´æ¿Õ¼ä
+                if (rbuf->head + length > rbuf->datasize) { //éœ€è¦è¿ç»­çš„å†…å­˜ç©ºé—´
+                    if (rbuf->tail > length) { //æ•°æ®åŒºåŸŸå°¾éƒ¨ä¸è¶³ä»¥åˆ†é…è¯¥å‘½ä»¤çš„å†…å­˜ç©ºé—´
                         rbuf->skip = rbuf->datasize - rbuf->head;
                         rbuf->head = 0;
                     } else {
-                        goto wait; //ÔİÊ±Ã»ÓĞ×ã¹»µÄ¿Õ¼ä
+                        goto wait; //æš‚æ—¶æ²¡æœ‰è¶³å¤Ÿçš„ç©ºé—´
                     }
                 }
             } else if (rbuf->head < rbuf->tail) {
                 if (rbuf->head + length > rbuf->tail) {
-                    goto wait;  //ÔİÊ±Ã»ÓĞ×ã¹»µÄ¿Õ¼ä
+                    goto wait;  //æš‚æ—¶æ²¡æœ‰è¶³å¤Ÿçš„ç©ºé—´
                 }
-            } else { //rbuf->head == rbuf->tail ±íÊ¾»º³åÇøÂú»ò¿Õ
+            } else { //rbuf->head == rbuf->tail è¡¨ç¤ºç¼“å†²åŒºæ»¡æˆ–ç©º
                 if (rbuf->full) {
                     goto wait;
                 }
@@ -188,7 +188,7 @@ wait:
 			cmd->state, cmd->off, cmd->length, (long long unsigned)cmd->seq, cmd->type, (long long int)cmd->offset);
 
     if (cmd->type == TypeWrite) {
-		memcpy(&(rbuf->buffer->data[cmd->off]), buf, length); //½«Êı¾İ¿½±´µ½¹²ÏíÄÚ´æÖĞ
+		memcpy(&(rbuf->buffer->data[cmd->off]), buf, length); //å°†æ•°æ®æ‹·è´åˆ°å…±äº«å†…å­˜ä¸­
     }
     eprintf("add cmd finish");
     return cmd;
@@ -204,7 +204,7 @@ int del(struct ringbuffer *rbuf, uint32_t idx)
     while (1) {
 		pthread_mutex_lock(&rbuf->mutex);
 		eprintf("del idx:%d recvix:%d", idx, rbuf->recvix);
-		if (idx == rbuf->recvix) { //ÃüÁîÍê³ÉµÄË³Ğò±ØĞëÓë½øÈëbufferË³ĞòÒ»ÖÂ
+		if (idx == rbuf->recvix) { //å‘½ä»¤å®Œæˆçš„é¡ºåºå¿…é¡»ä¸è¿›å…¥bufferé¡ºåºä¸€è‡´
 		    cmd = &(rbuf->buffer->cmds[idx]);
 			eprintf("del before seq:%llu sendix:%u recvix:%u restix:%u head:%u tail:%u skip:%u size:%u datasize:%u", (long long unsigned)cmd->seq,
                 rbuf->sendix, rbuf->recvix, rbuf->restix, rbuf->head, rbuf->tail, rbuf->skip, rbuf->size, rbuf->datasize);
