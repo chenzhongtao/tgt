@@ -2,7 +2,7 @@
 #define TGTADM_H
 
 //#define TGT_IPC_DIR		"/var/run/tgtd"
-#define TGT_IPC_DIR		    "/var/lib/comet/controller/target"
+#define TGT_IPC_DIR		    "/var/lib/vespace/controller/target"
 #define TGT_IPC_NAMESPACE	TGT_IPC_DIR"/socket"
 #define TGT_LLD_NAME_LEN	64
 
@@ -40,10 +40,10 @@ enum tgtadm_account_dir {
 };
 
 struct tgtadm_req {
-	enum tgtadm_mode mode;
-	enum tgtadm_op op;
+	enum tgtadm_mode mode; /* tgtadm_mode*/
+	enum tgtadm_op op; /* tgtadm_op*/
 	char lld[TGT_LLD_NAME_LEN];
-	uint32_t len;
+	uint32_t len; /* req长度 HDR+PUD*/
 	int32_t tid;
 	uint64_t sid;
 	uint64_t lun;
@@ -57,7 +57,7 @@ struct tgtadm_req {
 
 struct tgtadm_rsp {
 	uint32_t err;
-	uint32_t len;
+	uint32_t len; /*rsp长度 HDR+PUD*/
 };
 
 #endif

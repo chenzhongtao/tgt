@@ -27,6 +27,14 @@
 #define LOG_H
 
 #include <sys/sem.h>
+#include <syslog.h>
+#include <sys/time.h>
+#include <time.h>
+#include <stdio.h>
+
+
+
+
 
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
@@ -62,6 +70,92 @@ struct logarea {
 	union semun semarg;
 };
 
+extern int log_print_level;
+extern char *log_name;
+
+/*
+#define Log_debug(fmt, args...) \
+do { \
+    if (LOG_DEBUG <= log_print_level) \
+    { \
+        struct timeval tv; \
+        gettimeofday (&tv, NULL); \
+        struct tm *RetTime = localtime( &tv.tv_sec); \
+        char buffer[40]; \
+        vsprintf(buffer, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld %s: " fmt,RetTime->tm_year + 1900,RetTime->tm_mon + 1,RetTime->tm_mday \
+            ,RetTime->tm_hour,RetTime->tm_min,RetTime->tm_sec,tv.tv_usec,,log_name); \
+        vfprintf(stderr, "%s" fmt, (const char *)buffer[0], ##args); \
+        fflush(stderr); \
+    } \
+} \
+while (0)
+    */
+
+
+#define Log_debug(fmt, args...) \
+do { \
+    if (LOG_DEBUG <= log_print_level) \
+    { \
+        struct timeval tv; \
+        gettimeofday (&tv, NULL); \
+        struct tm *RetTime = localtime( &tv.tv_sec); \
+         fprintf(stderr, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld %s %s: [%s %s %d] " fmt,RetTime->tm_year + 1900,RetTime->tm_mon + 1,RetTime->tm_mday \
+            ,RetTime->tm_hour,RetTime->tm_min,RetTime->tm_sec,tv.tv_usec,"debug",log_name,__FILE__, __FUNCTION__, __LINE__,##args); \
+         fflush(stderr); \
+    } \
+} \
+while (0)
+
+
+#define Log_info(fmt, args...) \
+do { \
+    if (LOG_INFO <= log_print_level) \
+    { \
+        struct timeval tv; \
+        gettimeofday (&tv, NULL); \
+        struct tm *RetTime = localtime( &tv.tv_sec); \
+         fprintf(stderr, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld %s %s: [%s %s %d] " fmt,RetTime->tm_year + 1900,RetTime->tm_mon + 1,RetTime->tm_mday \
+            ,RetTime->tm_hour,RetTime->tm_min,RetTime->tm_sec,tv.tv_usec,"info",log_name,__FILE__, __FUNCTION__, __LINE__,##args); \
+         fflush(stderr); \
+    } \
+} \
+while (0)
+
+
+
+#define Log_warning(fmt, args...) \
+do { \
+    if (LOG_WARNING <= log_print_level) \
+    { \
+        struct timeval tv; \
+        gettimeofday (&tv, NULL); \
+        struct tm *RetTime = localtime( &tv.tv_sec); \
+         fprintf(stderr, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld %s %s: [%s %s %d] " fmt,RetTime->tm_year + 1900,RetTime->tm_mon + 1,RetTime->tm_mday \
+            ,RetTime->tm_hour,RetTime->tm_min,RetTime->tm_sec,tv.tv_usec,"warning",log_name,__FILE__, __FUNCTION__, __LINE__,##args); \
+         fflush(stderr); \
+    } \
+} \
+while (0)
+
+#define Log_error(fmt, args...) \
+do { \
+    if (LOG_ERR <= log_print_level) \
+    { \
+        struct timeval tv; \
+        gettimeofday (&tv, NULL); \
+        struct tm *RetTime = localtime( &tv.tv_sec); \
+         fprintf(stderr, "%04d-%02d-%02dT%02d:%02d:%02d.%06ld %s %s: [%s %s %d] " fmt,RetTime->tm_year + 1900,RetTime->tm_mon + 1,RetTime->tm_mday \
+            ,RetTime->tm_hour,RetTime->tm_min,RetTime->tm_sec,tv.tv_usec,"error",log_name,__FILE__,__FUNCTION__, __LINE__, ##args); \
+         fflush(stderr); \
+    } \
+} \
+while (0)
+
+
+
+
+
+
 extern int log_init (char * progname, int size, int daemon, int debug);
 extern void log_close (void);
 extern void dump_logmsg (void *);
@@ -86,8 +180,8 @@ do {									\
 } while (0)
 #else
 #define eprintf(fmt, args...)						\
-do {									\
-	log_error("%s(%d) " fmt, __FUNCTION__, __LINE__, ##args);	\
+do {	\
+	log_error("[%s %s %d] " fmt,__FILE__, __FUNCTION__, __LINE__, ##args);	\
 } while (0)
 
 #define dprintf(fmt, args...)						\

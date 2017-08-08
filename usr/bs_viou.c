@@ -1,5 +1,5 @@
 /*
- * comet block device backing store routine
+ * VeSpace block device backing store routine
  *
  * Copyright (C) 2016 chaolu zhang <finals@126.com>
  *
@@ -78,8 +78,9 @@ static void bs_viou_request(struct scsi_cmd *cmd)
     case WRITE_6:
     case WRITE_10:
     case WRITE_12:
+    case WRITE_16:
         length = scsi_get_out_length(cmd);
-        //log_debug("write command length:%u, offset:%lu", length, cmd->offset);
+        //Log_debug("write command length:%u, offset:%lu", length, cmd->offset);
         ret = write_at_unix(viou->conn, scsi_get_out_buffer(cmd), length, cmd->offset);
         if (ret) {
             eprintf("fail to write at %lx for %u\n", cmd->offset, length);
@@ -91,16 +92,30 @@ static void bs_viou_request(struct scsi_cmd *cmd)
 	case READ_12:
 	case READ_16:
 	    length = scsi_get_in_length(cmd);
-	    //log_debug("read command length:%u, offset:%lu", length, cmd->offset);
+	    //Log_debug("read command length:%u, offset:%lu", length, cmd->offset);
 	    ret = read_at_unix(viou->conn, scsi_get_in_buffer(cmd), length, cmd->offset);
 	    if (ret) {
             eprintf("fail to read at %lx for %u\n", cmd->offset, length);
             set_medium_error(&result, &key, &asc);
 	    }
 	    break;
-	default:
-	    eprintf("cmd->scb[0]: %x\n", cmd->scb[0]);
-	    break;
+    case SYNCHRONIZE_CACHE:
+        Log_debug("cmd->scb[0]: %x(SYNCHRONIZE_CACHE)\n", cmd->scb[0]);
+        break;
+    case WRITE_SAME:
+    case WRITE_SAME_16:
+        Log_debug("cmd->scb[0]: %x(WRITE_SAME)\n", cmd->scb[0]);
+        /* WRITE_SAME used to punch hole in file */
+        if (cmd->scb[1] & 0x08) {
+            Log_debug("WRITE_SAME set UNMAP bit, length:%u, offset:%lu\n",cmd->tl, cmd->offset);
+            break;
+        }
+        Log_debug("WRITE_SAME length:%u, offset:%lu\n",cmd->tl, cmd->offset);
+        break;
+    default:
+        Log_info("cmd->scb[0]: %x\n", cmd->scb[0]);
+        break;
+
     }
 
     dprintf("io done %p %x %d %u\n", cmd, cmd->scb[0], ret, length);

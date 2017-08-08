@@ -49,22 +49,22 @@ struct ringbuffer *init(char *shm_file)
     ringbuf->size = 32 << 20; //32M
     int fd = open(ringbuf->shm_file, O_RDWR | O_NONBLOCK | O_CREAT, 0666);
     if (fd < 0) {
-        log_error("[init] open file: %s return %d err:%s\n", ringbuf->shm_file, fd, strerror(errno));
+        Log_error("[init] open file: %s return %d err:%s\n", ringbuf->shm_file, fd, strerror(errno));
         goto error;
     }
 	//eprintf("@@@ fd:%d size:%d", fd, ringbuf->size);
 
 	if (ftruncate(fd, ringbuf->size) < 0) {
-        log_error("[init] ftruncate error\n");
+        Log_error("[init] ftruncate error\n");
         goto error;
 	}
 
     ringbuf->buffer = (struct ring *)mmap(NULL, ringbuf->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (ringbuf->buffer == (void *)-1) {
-        log_error("[init] mmap size:%u return -1\n", (unsigned int)(ringbuf->size));
+        Log_error("[init] mmap size:%u return -1\n", (unsigned int)(ringbuf->size));
         goto error;
     }
-    log_debug("[init] mmap size:%u fd:%d\n", (unsigned int)(ringbuf->size), fd);
+    Log_debug("[init] mmap size:%u fd:%d\n", (unsigned int)(ringbuf->size), fd);
 
     ringbuf->sendix = 0;
     ringbuf->recvix = 0;
@@ -76,7 +76,7 @@ struct ringbuffer *init(char *shm_file)
 
     rc = pthread_mutex_init(&ringbuf->mutex, NULL);
     if (rc < 0) {
-        log_error("[init] pthread_mutex_init return -1\n");
+        Log_error("[init] pthread_mutex_init return -1\n");
         goto error;
     }
 
@@ -87,19 +87,19 @@ struct ringbuffer *init(char *shm_file)
 
         rc = pthread_cond_init(&cmd->cond, NULL);
 	    if (rc < 0) {
-		    log_error("[init] Fail to init phread_cond\n");
+		    Log_error("[init] Fail to init phread_cond\n");
 		    goto error;
 	    }
 
     	rc = pthread_mutex_init(&cmd->mutex, NULL);
         if (rc < 0) {
-            log_error("[init] Fail to init phread_mutex\n");
+            Log_error("[init] Fail to init phread_mutex\n");
             goto error;
         }
 
         cidx = malloc(sizeof(struct cmnd_idx));
         if (cidx == NULL) {
-           log_error("[init] Fail malloc cmnd_idx\n");
+           Log_error("[init] Fail malloc cmnd_idx\n");
            goto error;
         }
         cidx->idx = i;
@@ -136,7 +136,7 @@ int destroy(struct ringbuffer *ringbuf)
 	    }
 
 		if (NULL != ringbuf->buffer) {
-		    log_debug("[destroy] size:%u", (unsigned int)(ringbuf->size));
+		    Log_debug("[destroy] size:%u\n", (unsigned int)(ringbuf->size));
 			munmap(ringbuf->buffer, ringbuf->size);
 		}
 
@@ -200,7 +200,7 @@ struct cmnd * add(struct ringbuffer *rbuf, void *buf, uint32_t length, int64_t o
 wait:
 		//wait for a minite
 		sched_yield();
-		log_debug("add cmd sched_yield\n");
+		Log_debug("add cmd sched_yield\n");
 	} while(1);
 
 	return cmd;
@@ -222,7 +222,7 @@ int del(struct ringbuffer *rbuf, uint32_t idx)
 		}
 
 		if (flag == 0) {
-			log_error("[del] Fatal error idx:%u not in used list\n", idx);
+			Log_error("[del] Fatal error idx:%u not in used list\n", idx);
 			pthread_mutex_unlock(&rbuf->mutex);
 			return -1;
 		}

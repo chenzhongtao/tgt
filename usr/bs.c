@@ -86,6 +86,7 @@ int is_bs_support_opcode(struct backingstore_template *bst, int op)
 	return test_bit(op, bst->bs_supported_ops);
 }
 
+/*注册一个backingstore到全局变量bst_list*/
 int register_backingstore_template(struct backingstore_template *bst)
 {
 	list_add(&bst->backingstore_siblings, &bst_list);
@@ -104,7 +105,7 @@ struct backingstore_template *get_backingstore_template(const char *name)
 	return NULL;
 }
 
-/* threading helper functions */
+/* threading helper functions 线程函数*/
 
 static void *bs_thread_ack_fn(void *arg)
 {
@@ -154,6 +155,7 @@ out:
 	pthread_exit(NULL);
 }
 
+/*done_fd[0] 有可读数据时被调用*/
 static void bs_thread_request_done(int fd, int events, void *data)
 {
 	struct scsi_cmd *cmd;
@@ -186,6 +188,7 @@ rewrite:
 	}
 }
 
+/*sig_fd有可读数据时被调用,完成request，回复结果给initiator*/
 static void bs_sig_request_done(int fd, int events, void *data)
 {
 	int ret;
@@ -199,6 +202,7 @@ static void bs_sig_request_done(int fd, int events, void *data)
 	}
 
 	pthread_mutex_lock(&finished_lock);
+    /*把finished_list复制到list,并初始化finished_list*/
 	list_splice_init(&finished_list, &list);
 	pthread_mutex_unlock(&finished_lock);
 
@@ -207,6 +211,7 @@ static void bs_sig_request_done(int fd, int events, void *data)
 
 		list_del(&cmd->bs_list);
 
+        /*完成cmd io*/
 		target_cmd_io_done(cmd, scsi_get_result(cmd));
 	}
 }
@@ -217,6 +222,7 @@ static void mutex_cleanup(void *mutex)
 	pthread_mutex_unlock(mutex);
 }
 
+/*多线程处理命令*/
 static void *bs_thread_worker_fn(void *arg)
 {
 	struct bs_thread_info *info = arg;
@@ -228,18 +234,20 @@ static void *bs_thread_worker_fn(void *arg)
 
 	while (1) {
 		pthread_mutex_lock(&info->pending_lock);
-		pthread_cleanup_push(mutex_cleanup, &info->pending_lock);
+		pthread_cleanup_push(mutex_cleanup, &info->pending_lock);/*pthread_cleanup_pop时调用mutex_cleanup, 或者线程退出时调用*/
 
 		while (list_empty(&info->pending_list))
 			pthread_cond_wait(&info->pending_cond,
 					  &info->pending_lock);
 
+        /*取出一个命令*/
 		cmd = list_first_entry(&info->pending_list,
 				       struct scsi_cmd, bs_list);
 
 		list_del(&cmd->bs_list);
 		pthread_cleanup_pop(1); /* Unlock pending_lock mutex */
 
+        /*处理cmd命令*/
 		info->request_fn(cmd);
 
 		pthread_mutex_lock(&finished_lock);
@@ -247,14 +255,15 @@ static void *bs_thread_worker_fn(void *arg)
 		pthread_mutex_unlock(&finished_lock);
 
 		if (sig_fd < 0)
-			pthread_cond_signal(&finished_cond);
+			pthread_cond_signal(&finished_cond); /* 使用bs_init_notify_thread()实现的机制*/
 		else
-			kill(getpid(), SIGUSR2);
+			kill(getpid(), SIGUSR2); /*给自己发个信号，sig_fd会收到 使用bs_init_signalfd()实现的机制*/ 
 	}
 
 	pthread_exit(NULL);
 }
 
+/*初始化信号fd*/
 static int bs_init_signalfd(void)
 {
 	sigset_t mask;
@@ -381,7 +390,7 @@ destroy_cond_mutex:
 int bs_init(void)
 {
 	int ret;
-
+    
 	ret = bs_init_signalfd();
 	if (!ret) {
 		eprintf("use signalfd notification\n");
@@ -397,6 +406,7 @@ int bs_init(void)
 	return 1;
 }
 
+/*创建线程*/
 tgtadm_err bs_thread_open(struct bs_thread_info *info, request_func_t *rfn,
 			  int nr_threads)
 {
@@ -459,6 +469,7 @@ void bs_thread_close(struct bs_thread_info *info)
 	free(info->worker_thread);
 }
 
+/*提交命令*/
 int bs_thread_cmd_submit(struct scsi_cmd *cmd)
 {
 	struct scsi_lu *lu = cmd->dev;

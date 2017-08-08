@@ -19,8 +19,8 @@
  * 02110-1301 USA
  */
 
-#ifndef __COMET_VIO_BLOCK_DEVICE__
-#define __COMET_VIO_BLOCK_DEVICE__
+#ifndef __VESPACE_VIO_BLOCK_DEVICE__
+#define __VESPACE_VIO_BLOCK_DEVICE__
 
 #include <pthread.h>
 
@@ -56,4 +56,4 @@ int write_at(struct vio_connection *conn, void *buf, size_t count, off_t offset)
 void start_response_processing(struct vio_connection *conn);
 
 
-#endif /* __COMET_VIO_BLOCK_DEVICE__ */
+#endif /* __VESPACE_VIO_BLOCK_DEVICE__ */

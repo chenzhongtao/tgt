@@ -1215,6 +1215,7 @@ int target_cmd_perform_passthrough(int tid, struct scsi_cmd *cmd)
 
 void target_cmd_io_done(struct scsi_cmd *cmd, int result)
 {
+    //Log_debug("offset:%lu length:%u cmd->scb[0]: %x\n",cmd->offset,scsi_get_out_length(cmd), cmd->scb[0]);
 	enum data_direction cmd_dir = scsi_get_data_dir(cmd);
 	struct lu_stat *stat = &cmd->itn_lu_info->stat;
 	int lid = cmd->c_target->lid;
@@ -1322,7 +1323,7 @@ static int abort_cmd(struct target *target, struct mgmt_req *mreq,
 {
 	int err = 0;
 
-	eprintf("found %" PRIx64 " %lx\n", cmd->tag, cmd->state);
+	eprintf("found %" PRIx64 " %lx  offset:%lu length:%u cmd->scb[0]: %x\n", cmd->tag, cmd->state,cmd->offset,scsi_get_out_length(cmd), cmd->scb[0]);
 
 	if (cmd_processed(cmd)) {
 		/*

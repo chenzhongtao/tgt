@@ -1,8 +1,8 @@
-VERSION ?= 3.0.8
+VERSION ?= 5.1.0
 
 export VERSION PREFIX
 
-sbindir ?= $(PREFIX)/sbin
+sbindir ?= $(PREFIX)/usr/local/bin
 libdir ?= $(PREFIX)/lib/tgt
 
 ifneq ($(shell test -e /usr/include/linux/signalfd.h && echo 1),)
@@ -49,7 +49,7 @@ CFLAGS += -g -O0 -ggdb -rdynamic
 else
 CFLAGS += -g -O2 -fno-strict-aliasing
 endif
-CFLAGS += -Wall -Wstrict-prototypes -Werror -fPIC
+CFLAGS += -Wall -Wstrict-prototypes -fPIC #-Werror
 CFLAGS += -DTGT_VERSION=\"$(VERSION)$(EXTRAVERSION)\"
 CFLAGS += -DBSDIR=\"$(DESTDIR)$(libdir)/backing-store\"
 
@@ -114,9 +114,11 @@ bs_glfs.so: bs_glfs.c
 install: $(PROGRAMS) $(MODULES)
 	install -d -m 755 $(DESTDIR)$(sbindir)
 	install -m 755 $(PROGRAMS) $(DESTDIR)$(sbindir)
+	cp targetd ../../bin && cp targetadm ../../bin
 ifneq ($(MODULES),)
 	install -d -m 755 $(DESTDIR)$(libdir)/backing-store
 	install -m 755 $(MODULES) $(DESTDIR)$(libdir)/backing-store
+	cp targetd ../../bin && cp targetadm ../../bin
 endif
 
 .PHONY: clean

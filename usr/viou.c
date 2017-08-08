@@ -39,9 +39,16 @@ int readn_unix(int fd, void *buf, int len) {
     while (readed < len) {
         ret = read(fd, buf + readed, len - readed);
         if (ret < 0) {
-            //eprintf("read return %d", ret);
-            return ret;
-        }
+            if (errno == EINTR){
+                ret = 0;
+            }
+            else{
+                //eprintf("read return %d", ret);
+                return ret;
+            }
+        }else if (ret == 0){
+            break; /*eof*/
+            }
         readed += ret;
     }
     return readed;
@@ -54,13 +61,19 @@ int writen_unix(int fd, void *buf, int len) {
     while (wrote < len) {
         ret = write(fd, buf + wrote, len - wrote);
         if (ret < 0) {
-            //eprintf("write return %d", ret);
-            return ret;
+            if (errno == EINTR){
+                ret = 0;
+            }
+            else{
+                //eprintf("read return %d", ret);
+                return ret;
+            }
         }
         wrote += ret;
      }
      return wrote;
 }
+
 
 int send_msg_unix(int fd, struct Message *msg) {
     int n = 0;
@@ -190,7 +203,7 @@ void* response_process_unix(void *arg) {
         if (ret != 0) {
             break;
         }
-
+        //Log_debug("[response_process_unix]command return seq:%ld type:%u offset:%ld length:%u\n",resp->Seq, resp->Type, (long)resp->Offset, resp->DataLength);
         switch (resp->Type) {
         case TypeOK:
             break;
@@ -208,8 +221,9 @@ void* response_process_unix(void *arg) {
                                         resp->Type, (unsigned long)resp->Seq, (char *)resp->Data);
             break;
         case TypeClose:
-            log_error("Receive close for response %d of seq %lu\n",
+            Log_error("Receive close for response %d of seq %lu\n",
                                         resp->Type, (unsigned long)resp->Seq);
+			conn->state = CLIENT_CONN_STATE_CLOSE; //prevent future requests
             pthread_mutex_lock(&conn->mutex);
             drain_request(conn);
             pthread_mutex_unlock(&conn->mutex);
@@ -314,6 +328,7 @@ int process_request_unix(struct viou_connection *conn, void *buf, size_t count, 
     if (conn->state != CLIENT_CONN_STATE_OPEN) {
         eprintf("Cannot queue in more request, Connection is closed");
         rc = -EFAULT;
+	    pthread_mutex_unlock(&conn->mutex);
         goto free;
     }
 
@@ -321,6 +336,7 @@ int process_request_unix(struct viou_connection *conn, void *buf, size_t count, 
     pthread_mutex_unlock(&conn->mutex);
 
     pthread_mutex_lock(&req->mutex);
+    Log_debug("[process_request_unix]seq:%ld type:%u offset:%ld length:%u\n",req->Seq, req->Type, (long)req->Offset, req->DataLength);
     rc = send_request_unix(conn, req);
     if (rc < 0) {
         eprintf("[process_request] type:%u send_request return:%d\n", req->Type, rc);
@@ -328,6 +344,7 @@ int process_request_unix(struct viou_connection *conn, void *buf, size_t count, 
     }
 
     pthread_cond_wait(&req->cond, &req->mutex);
+    Log_debug("[process_request_unix]command return seq:%ld type:%u offset:%ld length:%u\n",req->Seq, req->Type, (long)req->Offset, req->DataLength);
 
     if (req->Type != TypeOK) {
         eprintf("[process_request] type:%u offset:%ld length:%u\n", req->Type, (long)req->Offset, req->DataLength);

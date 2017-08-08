@@ -31,6 +31,9 @@
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <time.h>
+#include <sys/time.h>    
+
+
 
 #include "log.h"
 
@@ -43,10 +46,12 @@
 #endif
 
 static struct logarea *la;
-static char *log_name;
+char *log_name;
 int is_debug = 0;
 static pid_t pid;
 static FILE *logfile;
+int log_print_level = LOG_ERR; //LOG_ERR
+
 
 static int logarea_init (int size)
 {
@@ -302,7 +307,20 @@ static void dolog(int prio, const char *fmt, va_list ap)
 			return;
 		}
 	} else {
-		fprintf(stderr, "%s: ", log_name);
+	    // 2017-03-09T14:19:34.828089108
+	    //time(&Curtime);
+	    struct timeval tv;
+        gettimeofday (&tv, NULL);
+        struct tm *RetTime = localtime( &tv.tv_sec);
+        fprintf(stderr,"%04d-%02d-%02dT%02d:%02d:%02d.%06ld all %s: "
+                ,RetTime->tm_year + 1900
+                ,RetTime->tm_mon + 1 
+                ,RetTime->tm_mday
+                ,RetTime->tm_hour
+                ,RetTime->tm_min
+                ,RetTime->tm_sec
+                ,tv.tv_usec
+                ,log_name);
 		vfprintf(stderr, fmt, ap);
 		fflush(stderr);
 	}
@@ -331,6 +349,16 @@ void log_debug(const char *fmt, ...)
 	dolog(LOG_DEBUG, fmt, ap);
 	va_end(ap);
 }
+
+void dolog_wrapper(int prio,const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	dolog(prio, fmt, ap);
+	va_end(ap);
+}
+
+
 
 static void log_flush(void)
 {
@@ -380,7 +408,7 @@ int log_init(char *program_name, int size, int daemon, int debug)
 		openlog(log_name, 0, LOG_DAEMON);
 		setlogmask(LOG_UPTO (LOG_DEBUG));
 
-		logfile = fopen("/var/log/comet/target.log", "a+");
+		logfile = fopen("/var/log/vespace/target.log", "a+");
 	    if (logfile == NULL) {
             syslog(LOG_ERR, "failed to create log file\n");
             return 1;

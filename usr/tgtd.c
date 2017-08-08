@@ -57,13 +57,14 @@ static struct option const long_options[] = {
 	{"data-port", required_argument, 0, 'D'},
 	{"nr_iothreads", required_argument, 0, 't'},
 	{"name", required_argument, 0, 'n'},
+	{"loglevel", required_argument, 0, 'l'},
 	{"debug", required_argument, 0, 'd'},
 	{"version", no_argument, 0, 'V'},
 	{"help", no_argument, 0, 'h'},
 	{0, 0, 0, 0},
 };
 
-static char *short_options = "fC:d:t:Vh";
+static char *short_options = "fC:D:d:t:n:l:Vh";
 static char *spare_args;
 
 static void usage(int status)
@@ -81,6 +82,7 @@ static void usage(int status)
 		"-D, --data-port    NNNN use port NNNN for the data channel\n"
 		"-t, --nr_iothreads NNNN specify the number of I/O threads\n"
 		"-n, --name         NNNN specify the target name\n"
+		"-l, --loglevel     NNNN specify loglevel [debug,info,warning,error]\n"
 		"-d, --debug debuglevel  print debugging information\n"
 		"-V, --version           print version and exit\n"
 		"-h, --help              display this help and exit\n",
@@ -568,6 +570,17 @@ int main(int argc, char **argv)
 				bad_optarg(ret, ch, optarg);
 			break;
 		case 'n':
+		    break;
+        case 'l':
+            if (!strcmp(optarg,"debug")){
+                log_print_level = LOG_DEBUG;
+            }else if (!strcmp(optarg,"info")){
+                log_print_level = LOG_INFO;
+            }else if (!strcmp(optarg,"warning")){
+                log_print_level = LOG_WARNING;
+            }else if (!strcmp(optarg,"error")){
+                log_print_level = LOG_ERR;
+            }
 		    break;
 		case 'd':
 			ret = str_to_int_range(optarg, is_debug, 0, 1);

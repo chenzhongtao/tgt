@@ -28,7 +28,7 @@ struct concat_buf;
 #define BLOCK_DESCRIPTOR_LEN	8
 #define VERSION_DESCRIPTOR_LEN	8
 
-#define VENDOR_ID	"COMET"
+#define VENDOR_ID	"VeSpace"
 
 #define _TAB1 "    "
 #define _TAB2 _TAB1 _TAB1

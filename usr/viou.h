@@ -19,8 +19,8 @@
  * 02110-1301 USA
  */
 
-#ifndef __COMET_VIO_BLOCK_DEVICE__
-#define __COMET_VIO_BLOCK_DEVICE__
+#ifndef __VESPACE_VIO_BLOCK_DEVICE__
+#define __VESPACE_VIO_BLOCK_DEVICE__
 
 #include <pthread.h>
 #include "uthash.h"
@@ -78,4 +78,4 @@ int write_at_unix(struct viou_connection *conn, void *buf, size_t count, off_t o
 void start_response_processing_unix(struct viou_connection *conn);
 
 
-#endif /* __COMET_VIO_BLOCK_DEVICE__ */
+#endif /* __VESPACE_VIO_BLOCK_DEVICE__ */

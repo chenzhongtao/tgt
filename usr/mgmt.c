@@ -51,11 +51,11 @@ enum mgmt_task_state {
 struct mgmt_task {
 	enum mgmt_task_state mtask_state;
 	int retry;
-	int done;
-	struct tgtadm_req req;
-	char *req_buf;
-	int req_bsize;
-	struct tgtadm_rsp rsp;
+	int done; /*记录已读或已写数据量*/
+	struct tgtadm_req req; /*请求*/
+	char *req_buf; /*pdu 内容*/
+	int req_bsize; /*pdu size*/
+	struct tgtadm_rsp rsp; /*响应*/
 	struct concat_buf rsp_concat;
 /* 	struct tgt_work work; */
 };
@@ -600,6 +600,7 @@ static void mtask_free(struct mgmt_task *mtask)
 	free(mtask);
 }
 
+/*执行mtask*/
 static int mtask_received(struct mgmt_task *mtask, int fd)
 {
 	tgtadm_err adm_err;
@@ -629,6 +630,7 @@ static void mtask_recv_send_handler(int fd, int events, void *data)
 	case MTASK_STATE_HDR_RECV:
 		len = sizeof(*req) - mtask->done;
 		err = read(fd, (char *)req + mtask->done, len);
+        /* err为正整数是代表read到的字节数 */
 		if (err > 0) {
 			mtask->done += err;
 			if (mtask->done == sizeof(*req)) {

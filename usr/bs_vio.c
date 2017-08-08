@@ -1,5 +1,5 @@
 /*
- * comet block device backing store routine
+ * VeSpace block device backing store routine
  *
  * Copyright (C) 2016 chaolu zhang <finals@126.com>
  *
@@ -79,11 +79,12 @@ static void bs_vio_request(struct scsi_cmd *cmd)
     case WRITE_6:
     case WRITE_10:
     case WRITE_12:
+    case WRITE_16:
         length = scsi_get_out_length(cmd);
         //eprintf("write command length:%u, offset:%lu", length, cmd->offset);
         ret = write_at(vio->conn, scsi_get_out_buffer(cmd), length, cmd->offset);
         if (ret) {
-            log_error("[bs_vio_request] fail to write at %lx for %u\n", cmd->offset, length);
+            Log_error("[bs_vio_request] fail to write at %lx for %u\n", cmd->offset, length);
             set_medium_error(&result, &key, &asc);
         }
         break;
@@ -95,14 +96,25 @@ static void bs_vio_request(struct scsi_cmd *cmd)
 	    //eprintf("read command length:%u, offset:%lu", length, cmd->offset);
 	    ret = read_at(vio->conn, scsi_get_in_buffer(cmd), length, cmd->offset);
 	    if (ret) {
-            log_error("[bs_vio_request] fail to read at %lx for %u\n", cmd->offset, length);
+            Log_error("fail to read at %lx for %u\n", cmd->offset, length);
             set_medium_error(&result, &key, &asc);
 	    }
 	    break;
 	case SYNCHRONIZE_CACHE:
+        Log_debug("cmd->scb[0]: %x(SYNCHRONIZE_CACHE)\n", cmd->scb[0]);
 	    break;
+    case WRITE_SAME:
+	case WRITE_SAME_16:
+        Log_debug("cmd->scb[0]: %x(WRITE_SAME)\n", cmd->scb[0]);
+		/* WRITE_SAME used to punch hole in file */
+		if (cmd->scb[1] & 0x08) {
+			Log_debug("WRITE_SAME set UNMAP bit, length:%u, offset:%lu\n",cmd->tl, cmd->offset);
+			break;
+		}
+        Log_debug("WRITE_SAME length:%u, offset:%lu\n",cmd->tl, cmd->offset);
+        break;
 	default:
-	    log_debug("[bs_vio_request] cmd->scb[0]: %x\n", cmd->scb[0]);
+	    Log_info("cmd->scb[0]: %x\n", cmd->scb[0]);
 	    break;
     }
 
@@ -110,7 +122,7 @@ static void bs_vio_request(struct scsi_cmd *cmd)
 
     scsi_set_result(cmd, result);
     if (result != SAM_STAT_GOOD) {
-		log_error("[bs_vio_request] io error %p %x %d %d %" PRIu64 ", %m\n",
+		Log_error("[bs_vio_request] io error %p %x %d %d %" PRIu64 ", %m\n",
 			cmd, cmd->scb[0], ret, length, cmd->offset);
 		sense_data_build(cmd, key, asc);
 	}
@@ -122,7 +134,7 @@ static int vio_open(struct vio_info *vio, char *socket_path)
 
     vio->conn = new_vio_connection(socket_path, vio->shm_file);
     if (NULL == vio->conn) {
-        log_error("[vio_open] Cannot estibalish connection\n");
+        Log_error("[vio_open] Cannot estibalish connection\n");
         return -1;
     }
 
@@ -206,7 +218,7 @@ static tgtadm_err bs_vio_init(struct scsi_lu *lu, char *bsopts)
     }
 
     LOCATE_VIO_INFO(lu)->size = size;
-    log_debug("[bs_vio_init] threads:%d shm file: %s\n", nr_iothreads, LOCATE_VIO_INFO(lu)->shm_file);
+    Log_debug("[bs_vio_init] threads:%d shm file: %s\n", nr_iothreads, LOCATE_VIO_INFO(lu)->shm_file);
     return bs_thread_open(info, bs_vio_request, nr_iothreads);
 }
 
@@ -215,7 +227,7 @@ static void bs_vio_exit(struct scsi_lu *lu)
     struct bs_thread_info *info = BS_THREAD_I(lu);
 
     bs_thread_close(info);
-    log_debug("[bs_vio_exit] successfully\n");
+    Log_debug("[bs_vio_exit] successfully\n");
 }
 
 static struct backingstore_template vio_bst = {

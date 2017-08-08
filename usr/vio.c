@@ -40,9 +40,16 @@ int readn(int fd, void *buf, int len) {
     while (readed < len) {
         ret = read(fd, buf + readed, len - readed);
         if (ret < 0) {
-            //eprintf("read return %d", ret);
-            return ret;
-        }
+            if (errno == EINTR){
+                ret = 0;
+            }
+            else{
+                //eprintf("read return %d", ret);
+                return ret;
+            }
+        }else if (ret == 0){
+            break; /*eof*/
+            }
         readed += ret;
     }
     return readed;
@@ -55,8 +62,13 @@ int writen(int fd, void *buf, int len) {
     while (wrote < len) {
         ret = write(fd, buf + wrote, len - wrote);
         if (ret < 0) {
-            //eprintf("write return %d", ret);
-            return ret;
+            if (errno == EINTR){
+                ret = 0;
+            }
+            else{
+                //eprintf("read return %d", ret);
+                return ret;
+            }
         }
         wrote += ret;
      }
@@ -69,7 +81,7 @@ int send_msg(int fd, uint32_t idx) {
 
     n = writen(fd, &idx, sizeof(idx));
     if (n != sizeof(idx)) {
-        log_error("[send_msg] writen return: %d\n", n);
+        Log_error("[send_msg] writen return: %d\n", n);
         return -EINVAL;
     }
 
@@ -83,7 +95,7 @@ int receive_msg(int fd, uint32_t *idx) {
 
 	n = readn(fd, idx, sizeof(*idx));
     if (n != sizeof(*idx)) {
-        log_error("[receive_msg] readn return: %d\n", n);
+        Log_error("[receive_msg] readn return: %d\n", n);
 		return -EINVAL;
     }
 
@@ -112,57 +124,60 @@ void* response_process(void *arg) {
     struct cmnd *cmd;
     int ret = 0;
     uint32_t idx;
-    //log_debug("000");
+    //Log_debug("000");
 	//ret = receive_response(conn, resp);
     while (1) {
         ret = receive_response(conn, &idx);
         if (ret != 0) {
-            log_error("[receive_response] idx:%u ret:%d\n", idx, ret);
+            Log_error("[receive_response] idx:%u ret:%d\n", idx, ret);
             goto exit;
         }
-		//log_debug("111 Receive idx:%u", idx);
+		//Log_debug("111 Receive idx:%u", idx);
         cmd = get(conn->msg_buffer, idx);
         if (NULL == cmd) {
-            log_error("[receive_response] ring get idx:%u cmd==NULL\n", idx);
+            Log_error("[receive_response] ring get idx:%u cmd==NULL\n", idx);
             ret = -1;
             break;
         }
 
-		//log_debug("222 rtype: %d", cmd->rtype);
+		//Log_debug("222 rtype: %d", cmd->rtype);
         switch (cmd->rtype) {
         case TypeOK:
             break;
         case TypeError:
-            log_error("[receive_response] Receive error for response %d of seq %lu\n",
+            Log_error("[receive_response] Receive error for response %d of seq %lu\n",
                                         cmd->rtype, (unsigned long)cmd->seq);
             /* fall through so we can response to caller */
             break;
         case TypeEOF:
-            log_error("[receive_response] Receive eof for response %d of seq %lu\n",
+            Log_error("[receive_response] Receive eof for response %d of seq %lu\n",
                                         cmd->rtype, (unsigned long)cmd->seq);
             break;
         case TypeTimeout:
-            log_error("[receive_response] Receive timeout for response %d of seq %lu\n",
+            Log_error("[receive_response] Receive timeout for response %d of seq %lu\n",
                                         cmd->rtype, (unsigned long)cmd->seq);
             break;
         case TypeClose:
-            log_error("[receive_response] Receive close for response %d of seq %lu\n",
+            Log_error("[receive_response] Receive close for response %d of seq %lu\n",
                                         cmd->rtype, (unsigned long)cmd->seq);
+			conn->state = CLIENT_CONN_STATE_CLOSE; //prevent future requests
             pthread_mutex_lock(&conn->mutex);
             drain_cmnd(conn);
             pthread_mutex_unlock(&conn->mutex);
             break;
         default:
-            log_error("[receive_response] Unknown message type %d\n", cmd->rtype);
+            Log_error("[receive_response] Unknown message type %d\n", cmd->rtype);
         }
 
-		//log_debug("333 cond: %p", &cmd->cond);
-        pthread_cond_signal(&cmd->cond);
+		//Log_debug("333 cond: %p", &cmd->cond);
+        //pthread_mutex_lock(&cmd->mutex);
+        pthread_mutex_unlock(&cmd->mutex);
+        //pthread_cond_signal(&cmd->cond);
         //ret = receive_response(conn, resp);
     }
 
     if (ret != 0) {
-        log_error("[receive_response] Receive response returned error\n");
+        Log_error("[receive_response] Receive response returned error\n");
     }
 
 exit:
@@ -174,12 +189,12 @@ void start_response_processing(struct vio_connection *conn) {
 
     rc = pthread_create(&conn->response_thread, NULL, &response_process, conn);
     if (rc < 0) {
-        log_error("[start_response_processing] Fail to create response thread\n");
+        Log_error("[start_response_processing] Fail to create response thread\n");
         return;
     }
     rc = pthread_detach(conn->response_thread);
     if (rc < 0) {
-        log_error("[start_response_processing] Fail to detach thread ret:%d\n", (int)rc);
+        Log_error("[start_response_processing] Fail to detach thread ret:%d\n", (int)rc);
     }
 }
 
@@ -194,43 +209,46 @@ int process_request(struct vio_connection *conn, void *buf, size_t count, off_t 
     int rc = 0;
     uint32_t idx = 0; //命令数组的下标
 
-    //log_debug("000");
+    //Log_debug("000");
 
     if (type != TypeRead && type != TypeWrite) {
-        log_error("[process_request] BUG: Invalid type for process_request %d\n", type);
+        Log_error("[process_request] BUG: Invalid type for process_request %d\n", type);
         rc = -EFAULT;
         goto free;
     }
 
-	//log_debug("[process_request] type:%u offset:%ld length:%u\n", req->Type, (long)req->Offset, req->DataLength);
+	//Log_debug("[process_request] type:%u offset:%ld length:%u\n", req->Type, (long)req->Offset, req->DataLength);
 	pthread_mutex_lock(&conn->mutex);
 	if (conn->state != CLIENT_CONN_STATE_OPEN) {
-		log_error("[process_request] Cannot queue in more request, Connection is closed\n");
+		Log_error("[process_request] Cannot queue in more request, Connection is closed\n");
 		rc = -EFAULT;
+	    pthread_mutex_unlock(&cmd->mutex);
 		goto free;
 	}
 	pthread_mutex_unlock(&conn->mutex);
 
-	//log_debug("111 length:%d, offset:%u type:%u", (unsigned int)count,
+	//Log_debug("111 length:%d, offset:%u type:%u", (unsigned int)count,
 	//    (unsigned int)offset, (unsigned int)type);
     cmd = add(conn->msg_buffer, buf, count, offset, type, new_seq(conn), &idx);
-    //log_debug("222 add return cmd:%p idx:%u", cmd, idx);
+    //Log_debug("222 add return cmd:%p idx:%u", cmd, idx);
+    Log_debug("[process_request]seq:%ld type:%u offset:%ld length:%zu idx:%d\n",cmd->seq, type, (long)offset, count,idx);
 
-	//log_debug("333");
+	//Log_debug("333");
 	pthread_mutex_lock(&cmd->mutex);
     rc = send_request(conn, idx);
     if (rc < 0) {
-        log_error("[process_request] type:%u send_request return:%d\n", cmd->type, rc);
+        Log_error("[process_request] type:%u send_request return:%d\n", cmd->type, rc);
         goto out;
     }
-	//log_debug("444");
+	//Log_debug("444");
 
-    //log_debug("555 idx:%u cond:%p", idx, &cmd->cond);
-    pthread_cond_wait(&cmd->cond, &cmd->mutex);
-	//log_debug("666 command type: %d", cmd->rtype);
+    //Log_debug("555 idx:%u cond:%p", idx, &cmd->cond);
+    pthread_mutex_lock(&cmd->mutex); //等待response那边解锁，pthread_cond_wait 可能response的pthread_cond_signal提前了，导致wait卡死
+    //pthread_cond_wait(&cmd->cond, &cmd->mutex);
+    Log_debug("[process_request]command return seq:%ld type:%d offset:%ld length:%d\n",cmd->seq, cmd->rtype, (long)cmd->offset, cmd->length);
 
     if (cmd->rtype != TypeOK) {
-        log_error("[process_request] type:%u offset:%ld length:%u\n", cmd->type, (long)cmd->offset, cmd->length);
+        Log_error("[process_request] type:%u offset:%ld length:%u\n", cmd->type, (long)cmd->offset, cmd->length);
         rc = -EFAULT;
         goto out;
     }
@@ -240,9 +258,9 @@ int process_request(struct vio_connection *conn, void *buf, size_t count, off_t 
     }
 
 out:
-	//log_debug("888 idx: %d", idx);
+	//Log_debug("888 idx: %d", idx);
 	del(conn->msg_buffer, idx);
-	//log_debug("999 del return idx: %d", idx);
+	//Log_debug("999 del return idx: %d", idx);
     pthread_mutex_unlock(&cmd->mutex);
 
 free:
@@ -266,7 +284,7 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
 
     conn = malloc(sizeof(struct vio_connection));
     if (conn == NULL) {
-        log_error("[new_vio_connection] cannot allocate memory for conn\n");
+        Log_error("[new_vio_connection] cannot allocate memory for conn\n");
         return NULL;
     }
 
@@ -274,20 +292,20 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
     //在open共享文件时，报no such file or directory
     conn->msg_buffer = (struct ringbuffer *)init(shm_file);
     if (NULL == conn->msg_buffer) {
-        log_error("[new_vio_connection] fail to alloc ringbuffer\n");
+        Log_error("[new_vio_connection] fail to alloc ringbuffer\n");
         exit(-EFAULT);
     }
 
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1) {
-        log_error("[new_vio_connection] socket error\n");
+        Log_error("[new_vio_connection] socket error\n");
         exit(-1);
     }
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     if (strlen(socket_path) >= 108) {
-        log_error("[new_vio_connection] socket path is too long, more than 108 characters\n");
+        Log_error("[new_vio_connection] socket path is too long, more than 108 characters\n");
         exit(-EINVAL);
     }
 
@@ -299,12 +317,12 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
             break;
         }
 
-        log_warning("[new_vio_connection] connect error, retrying\n");
+        Log_warning("[new_vio_connection] connect error, retrying\n");
         sleep(interval);
     }
 
     if (connected == 0) {
-        log_error("[new_vio_connection] connect error\n");
+        Log_error("[new_vio_connection] connect error\n");
         exit(-EFAULT);
     }
 
@@ -313,11 +331,11 @@ struct vio_connection *new_vio_connection(char *socket_path, char *shm_file) {
 
     rc = pthread_mutex_init(&conn->mutex, NULL);
     if (rc < 0) {
-        log_error("[new_vio_connection] fail to init conn->mutex\n");
+        Log_error("[new_vio_connection] fail to init conn->mutex\n");
         exit(-EFAULT);
     }
 
-	log_debug("[new_vio_connection] socket_path:%s successfully\n", socket_path);
+	Log_debug("[new_vio_connection] socket_path:%s successfully\n", socket_path);
     conn->state = CLIENT_CONN_STATE_OPEN;
     return conn;
 }
@@ -356,7 +374,7 @@ int shutdown_vio_connection1(struct vio_connection *conn) {
             break;
         }
         pthread_mutex_unlock(&conn->msg_buffer->mutex);
-        log_debug("shutdown_vio_connection wait for cmd complete retry:%d", retry);
+        Log_debug("shutdown_vio_connection wait for cmd complete retry:%d", retry);
         usleep(100000); //100ms
     }
 
@@ -366,7 +384,7 @@ int shutdown_vio_connection1(struct vio_connection *conn) {
     close(conn->fd);
     free(conn);
     conn=NULL;
-    log_debug("shutdown_vio_connection successfully\n");
+    Log_debug("shutdown_vio_connection successfully\n");
     return 0;
 }
 
@@ -375,6 +393,7 @@ int shutdown_vio_connection(struct vio_connection *conn) {
     if (NULL == conn) {
         return 0;
     }
+	Log_debug("shutdown_vio_connection entry\n");
 
     pthread_mutex_lock(&conn->mutex);
     if (conn->state == CLIENT_CONN_STATE_CLOSE) {
@@ -392,7 +411,7 @@ int shutdown_vio_connection(struct vio_connection *conn) {
     close(conn->fd);
     free(conn);
     conn=NULL;
-    log_debug("shutdown_vio_connection successfully\n");
+    Log_debug("shutdown_vio_connection successfully\n");
     return 0;
 }
 
@@ -411,7 +430,8 @@ void drain_cmnd(struct vio_connection *conn) {
         cmd = cidx->cmd;
 		cmd->rtype = TypeError;
         pthread_mutex_unlock(&conn->msg_buffer->mutex);
-        pthread_cond_signal(&cmd->cond);
+		pthread_mutex_unlock(&cmd->mutex);
+        //pthread_cond_signal(&cmd->cond);
     }
 
     //等待所有命令返回iscsi
@@ -422,7 +442,7 @@ void drain_cmnd(struct vio_connection *conn) {
             break;
         }
         pthread_mutex_unlock(&conn->msg_buffer->mutex);
-        log_debug("shutdown_vio_connection wait for cmd complete retry:%d", retry);
+        Log_debug("shutdown_vio_connection wait for cmd complete retry:%d", retry);
         usleep(100000); //100ms
     }
 
